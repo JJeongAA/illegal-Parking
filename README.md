@@ -10,7 +10,7 @@
 드라이브 링크: https://drive.google.com/drive/folders/1T_IUpbJ_JP0ElSQRkEOVAZGiZrOX0QGZ?usp=drive_link
 -> 여기서 다운받으시면 됩니다.
 
-(1) baseline_convlstm.py
+(1) baseline_convlstm.py 
 (2) baseline_lstm.py
 (3) convlstm_batch.py
 ==> 서울시 관련 학습 모델 (3레이어: 불법주정차단속현황, 불법주정차단속카메라위치, 서울시POI)
@@ -19,3 +19,15 @@
 (2) h_lstm.py
 (3) h_convlstm_Batch.py
 ==> 서울-해운대 전이학습 모델
+
+=============================================================================
+실험결과폴더(서울시)
+(1) convlstm_improved_no_bn_results: baseline_convlstm 결과
+(2) lstm_3channel_results: baseline_lstm 결과
+(3) convlstm_improved_results: convlstm 결과
+==============================================================================
+실험결과폴더(해운대)
+(1) haeundae_transfer_no_bn_3ch_results: h_convlstm 결과
+(2) haeundae_lstm_transfer_poi_results: h_lstm 결과
+(3) haeundae_transfer_bn_3ch_results:h_convlstm_Batch 결과
+==============================================================================
