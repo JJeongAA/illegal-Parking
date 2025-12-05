@@ -19,7 +19,7 @@
 (2) h_lstm.py
 (3) h_convlstm_Batch.py
 ==> 서울-해운대 전이학습 모델
--------------------------------------------------
+
 실험결과폴더(서울시)
 (1) convlstm_improved_no_bn_results: baseline_convlstm 결과
 (2) lstm_3channel_results: baseline_lstm 결과
