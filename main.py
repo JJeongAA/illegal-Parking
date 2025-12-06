@@ -29,7 +29,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 models = {}
 
 # ✅ Hugging Face 저장소 설정 (본인 username으로 변경!)
-HF_REPO_ID = "YOUR_USERNAME/illegal-parking-models"
+HF_REPO_ID = "audyddl/illegal-parking-models"
 
 # ==================== 모델 클래스 ====================
 
@@ -442,4 +442,5 @@ if os.path.exists('static'):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
