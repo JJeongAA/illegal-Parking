@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>불법주정차 예측 시스템</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: #f8f9fa;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid #dee2e6;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .control-group h3 {
+            font-size: 14px;
+            color: #495057;
+            margin-bottom: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .radio-option:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .radio-option input[type="radio"] {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .radio-option input[type="radio"]:checked + label {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .radio-option label {
+            cursor: pointer;
+            flex: 1;
+            font-size: 14px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #map {
+            flex: 1;
+            position: relative;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+
+        .legend h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 30px;
+            height: 20px;
+            margin-right: 8px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+        }
+
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            z-index: 2000;
+            text-align: center;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #004085;
+            border-left: 4px solid #667eea;
+        }
+
+        .metadata {
+            margin-top: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            font-size: 12px;
+            border: 1px solid #e9ecef;
+        }
+
+        .metadata-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #f8f9fa;
+        }
+
+        .metadata-item:last-child {
+            border-bottom: none;
+        }
+
+        .metadata-label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .metadata-value {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🚗 불법주정차 예측 시스템</h1>
+    </header>
+
+    <div class="container">
+        <aside class="sidebar">
+            <div class="control-group">
+                <h3>📍 지역 선택</h3>
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" name="region" value="seoul" id="region-seoul" checked>
+                        <label for="region-seoul">서울특별시</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" name="region" value="haeundae" id="region-haeundae">
+                        <label for="region-haeundae">부산 해운대구</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>🤖 모델 선택</h3>
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" name="model" value="convlstm_nobn" id="model-convlstm-nobn" checked>
+                        <label for="model-convlstm-nobn">ConvLSTM (No BN)</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" name="model" value="convlstm_bn" id="model-convlstm-bn">
+                        <label for="model-convlstm-bn">ConvLSTM (BN)</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" name="model" value="lstm" id="model-lstm">
+                        <label for="model-lstm">LSTM</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <button id="predict-btn">🔮 예측하기</button>
+            </div>
+
+            <div class="info-box">
+                💡 지역과 모델을 선택한 후 예측하기 버튼을 클릭하세요.
+            </div>
+
+            <div id="metadata-container"></div>
+        </aside>
+
+        <main id="map"></main>
+
+        <div class="legend">
+            <h4>예측 강도</h4>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #E31A1C;"></div>
+                <span>높음 (0.7~1.0)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FD8D3C;"></div>
+                <span>중간 (0.3~0.7)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FEF0D9;"></div>
+                <span>낮음 (0.0~0.3)</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>예측 중입니다...</p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 지도 초기화
+        let map = L.map('map').setView([37.5665, 126.978], 11);
+        let predictionLayer = null;
+
+        // 타일 레이어
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        // 지역별 중심 좌표
+        const regionCenters = {
+            seoul: { center: [37.5665, 126.978], zoom: 11 },
+            haeundae: { center: [35.1650, 129.1650], zoom: 13 }
+        };
+
+        // 지역 변경 시 지도 이동
+        document.querySelectorAll('input[name="region"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const region = e.target.value;
+                const config = regionCenters[region];
+                map.setView(config.center, config.zoom);
+                
+                // 기존 예측 레이어 제거
+                if (predictionLayer) {
+                    map.removeLayer(predictionLayer);
+                    predictionLayer = null;
+                }
+                
+                // 메타데이터 초기화
+                document.getElementById('metadata-container').innerHTML = '';
+            });
+        });
+
+        // 예측 버튼 클릭
+        document.getElementById('predict-btn').addEventListener('click', async () => {
+            const region = document.querySelector('input[name="region"]:checked').value;
+            const model = document.querySelector('input[name="model"]:checked').value;
+            
+            // 로딩 표시
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('predict-btn').disabled = true;
+
+            try {
+                // API 호출
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        region: region,
+                        model: model,
+                        date: new Date().toISOString().split('T')[0]
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('예측 실패');
+                }
+
+                const result = await response.json();
+
+                // 기존 레이어 제거
+                if (predictionLayer) {
+                    map.removeLayer(predictionLayer);
+                }
+
+                // 새 레이어 추가
+                predictionLayer = L.geoJSON(result.data, {
+                    style: (feature) => ({
+                        fillColor: feature.properties.color,
+                        fillOpacity: 0.6,
+                        color: '#000',
+                        weight: 1
+                    }),
+                    onEachFeature: (feature, layer) => {
+                        const props = feature.properties;
+                        layer.bindPopup(`
+                            <div style="padding: 10px;">
+                                <h4 style="margin: 0 0 10px 0;">예측 정보</h4>
+                                <p style="margin: 5px 0;"><strong>그리드 ID:</strong> ${props.grid_id}</p>
+                                <p style="margin: 5px 0;"><strong>예측값:</strong> ${props.prediction}</p>
+                                <p style="margin: 5px 0;"><strong>강도:</strong> ${props.intensity}</p>
+                            </div>
+                        `);
+                    }
+                }).addTo(map);
+
+                // 메타데이터 표시
+                displayMetadata(result.metadata);
+
+            } catch (error) {
+                alert('예측 중 오류가 발생했습니다: ' + error.message);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('predict-btn').disabled = false;
+            }
+        });
+
+        function displayMetadata(metadata) {
+            const container = document.getElementById('metadata-container');
+            container.innerHTML = `
+                <div class="metadata">
+                    <h4 style="margin: 0 0 10px 0; font-size: 14px;">📊 예측 결과</h4>
+                    <div class="metadata-item">
+                        <span class="metadata-label">지역</span>
+                        <span class="metadata-value">${metadata.region}</span>
+                    </div>
+                    <div class="metadata-item">
+                        <span class="metadata-label">모델</span>
+                        <span class="metadata-value">${metadata.model}</span>
+                    </div>
+                    <div class="metadata-item">
+                        <span class="metadata-label">날짜</span>
+                        <span class="metadata-value">${metadata.date}</span>
+                    </div>
+                    <div class="metadata-item">
+                        <span class="metadata-label">그리드 크기</span>
+                        <span class="metadata-value">${metadata.grid_size[0]}×${metadata.grid_size[1]}</span>
+                    </div>
+                    <div class="metadata-item">
+                        <span class="metadata-label">예측 그리드 수</span>
+                        <span class="metadata-value">${metadata.prediction_count}</span>
+                    </div>
+                    <div class="metadata-item">
+                        <span class="metadata-label">최대값</span>
+                        <span class="metadata-value">${metadata.max_value.toFixed(4)}</span>
+                    </div>
+                    <div class="metadata-item">
+                        <span class="metadata-label">평균값</span>
+                        <span class="metadata-value">${metadata.mean_value.toFixed(4)}</span>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
