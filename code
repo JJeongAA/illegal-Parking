@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHP 파일 뷰어</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .upload-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .drop-zone {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 50px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+        
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: #764ba2;
+            background: #f0f2ff;
+            transform: scale(1.02);
+        }
+        
+        .drop-zone-text {
+            font-size: 1.2em;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .drop-zone-subtext {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .map-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        
+        #map {
+            height: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .info-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .info-panel h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .feature-item {
+            background: #f8f9ff;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .feature-item:hover {
+            background: #f0f2ff;
+            transform: translateX(5px);
+            transition: all 0.3s ease;
+        }
+        
+        .property {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .property:last-child {
+            border-bottom: none;
+        }
+        
+        .property-key {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .property-value {
+            color: #777;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .clear-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        
+        .clear-btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ SHP 파일 뷰어</h1>
+        
+        <div class="upload-section">
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-text">📁 SHP 파일을 여기에 드래그하거나 클릭하세요</div>
+                <div class="drop-zone-subtext">.shp, .dbf, .shx 파일을 함께 선택해주세요 (Zip 파일도 가능)</div>
+            </div>
+            <input type="file" id="fileInput" multiple accept=".shp,.dbf,.shx,.prj,.zip">
+            <div id="status"></div>
+            <button class="clear-btn" id="clearBtn" style="display:none;">지도 초기화</button>
+        </div>
+        
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+        
+        <div class="info-panel" id="infoPanel" style="display:none;">
+            <h3>피처 정보</h3>
+            <div id="featureList"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shpjs/4.0.4/shp.min.js"></script>
+    
+    <script>
+        // 한국 좌표계 정의
+        proj4.defs([
+            ['EPSG:5179', '+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'],
+            ['EPSG:5181', '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'],
+            ['EPSG:5186', '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'],
+            ['EPSG:5187', '+proj=tmerc +lat_0=38 +lon_0=129 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'],
+            ['EPSG:5174', '+proj=tmerc +lat_0=38 +lon_0=127.0028902777778 +k=1 +x_0=200000 +y_0=500000 +ellps=bessel +units=m +no_defs +towgs84=-115.80,474.99,261.20,0,0,0,0'],
+            ['EPSG:2097', '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=bessel +units=m +no_defs +towgs84=-115.80,474.99,261.20,0,0,0,0']
+        ]);
+        
+        // 지도 초기화
+        const map = L.map('map').setView([37.5665, 126.9780], 7);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        let currentLayer = null;
+        let allFeatures = [];
+        let sourceProjection = null;
+        
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status');
+        const infoPanel = document.getElementById('infoPanel');
+        const featureList = document.getElementById('featureList');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        // 드래그 앤 드롭 이벤트
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            handleFiles(e.dataTransfer.files);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+        
+        clearBtn.addEventListener('click', () => {
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+                currentLayer = null;
+            }
+            allFeatures = [];
+            sourceProjection = null;
+            infoPanel.style.display = 'none';
+            clearBtn.style.display = 'none';
+            status.innerHTML = '';
+            map.setView([37.5665, 126.9780], 7);
+        });
+        
+        async function handleFiles(files) {
+            status.innerHTML = '<div class="status">파일 처리 중...</div>';
+            
+            try {
+                const fileArray = Array.from(files);
+                
+                // PRJ 파일 먼저 읽기
+                const prjFile = fileArray.find(f => f.name.endsWith('.prj'));
+                if (prjFile) {
+                    const prjText = await prjFile.text();
+                    sourceProjection = parsePRJ(prjText);
+                    console.log('감지된 좌표계:', sourceProjection);
+                }
+                
+                // ZIP 파일 체크
+                const zipFile = fileArray.find(f => f.name.endsWith('.zip'));
+                
+                if (zipFile) {
+                    const arrayBuffer = await zipFile.arrayBuffer();
+                    const geojson = await shp(arrayBuffer);
+                    displayGeoJSON(geojson);
+                } else {
+                    // 개별 파일들 처리
+                    const shpFile = fileArray.find(f => f.name.endsWith('.shp'));
+                    const dbfFile = fileArray.find(f => f.name.endsWith('.dbf'));
+                    
+                    if (!shpFile) {
+                        throw new Error('.shp 파일이 필요합니다');
+                    }
+                    
+                    const shpBuffer = await shpFile.arrayBuffer();
+                    const dbfBuffer = dbfFile ? await dbfFile.arrayBuffer() : null;
+                    
+                    const geojson = await shp.combine([
+                        shp.parseShp(shpBuffer),
+                        dbfBuffer ? shp.parseDbf(dbfBuffer) : []
+                    ]);
+                    
+                    displayGeoJSON(geojson);
+                }
+                
+                status.innerHTML = '<div class="status success">✓ 파일이 성공적으로 로드되었습니다!' + 
+                    (sourceProjection ? `<br>좌표계: ${sourceProjection}` : '') + '</div>';
+                clearBtn.style.display = 'inline-block';
+                
+            } catch (error) {
+                status.innerHTML = `<div class="status error">✗ 오류: ${error.message}</div>`;
+                console.error('Error:', error);
+            }
+        }
+        
+        function parsePRJ(prjText) {
+            // EPSG 코드 추출
+            const epsgMatch = prjText.match(/EPSG[",:](\d+)/i);
+            if (epsgMatch) {
+                return 'EPSG:' + epsgMatch[1];
+            }
+            
+            // 한국 좌표계 감지
+            if (prjText.includes('Korea_2000') || prjText.includes('GRS_1980')) {
+                if (prjText.includes('Central_Belt')) return 'EPSG:5181';
+                if (prjText.includes('East_Belt')) return 'EPSG:5187';
+                if (prjText.includes('West_Belt')) return 'EPSG:5186';
+                return 'EPSG:5179'; // 기본값
+            }
+            
+            if (prjText.includes('Bessel_1841')) {
+                return 'EPSG:5174';
+            }
+            
+            // UTM 좌표계 감지
+            const utmMatch = prjText.match(/UTM.*Zone.*(\d+)/i);
+            if (utmMatch) {
+                const zone = utmMatch[1];
+                const isNorth = !prjText.includes('South');
+                return `EPSG:${isNorth ? 326 : 327}${zone.padStart(2, '0')}`;
+            }
+            
+            return null;
+        }
+        
+        function transformCoordinates(coords, fromProj) {
+            if (!fromProj || fromProj === 'EPSG:4326') return coords;
+            
+            try {
+                const transformed = proj4(fromProj, 'EPSG:4326', coords);
+                return transformed;
+            } catch (e) {
+                console.error('좌표 변환 오류:', e);
+                return coords;
+            }
+        }
+        
+        function transformGeometry(geometry, fromProj) {
+            if (!fromProj || fromProj === 'EPSG:4326') return geometry;
+            
+            const transformCoordArray = (coordArray) => {
+                if (typeof coordArray[0] === 'number') {
+                    return transformCoordinates(coordArray, fromProj);
+                }
+                return coordArray.map(c => transformCoordArray(c));
+            };
+            
+            return {
+                ...geometry,
+                coordinates: transformCoordArray(geometry.coordinates)
+            };
+        }
+        
+        function displayGeoJSON(geojson) {
+            // 기존 레이어 제거
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+            }
+            
+            allFeatures = [];
+            
+            // 좌표 변환
+            if (sourceProjection) {
+                if (geojson.type === 'FeatureCollection') {
+                    geojson.features = geojson.features.map(feature => ({
+                        ...feature,
+                        geometry: transformGeometry(feature.geometry, sourceProjection)
+                    }));
+                } else {
+                    geojson.geometry = transformGeometry(geojson.geometry, sourceProjection);
+                }
+            }
+            
+            // GeoJSON 레이어 추가
+            currentLayer = L.geoJSON(geojson, {
+                style: {
+                    color: '#667eea',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillColor: '#764ba2',
+                    fillOpacity: 0.3
+                },
+                pointToLayer: (feature, latlng) => {
+                    return L.circleMarker(latlng, {
+                        radius: 8,
+                        fillColor: '#667eea',
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                },
+                onEachFeature: (feature, layer) => {
+                    allFeatures.push(feature);
+                    
+                    // 팝업 추가
+                    if (feature.properties) {
+                        let popupContent = '<div style="max-width: 300px;">';
+                        for (let key in feature.properties) {
+                            popupContent += `<b>${key}:</b> ${feature.properties[key]}<br>`;
+                        }
+                        popupContent += '</div>';
+                        layer.bindPopup(popupContent);
+                    }
+                    
+                    // 하이라이트 효과
+                    layer.on('mouseover', function(e) {
+                        this.setStyle({
+                            weight: 4,
+                            color: '#764ba2',
+                            fillOpacity: 0.6
+                        });
+                    });
+                    
+                    layer.on('mouseout', function(e) {
+                        currentLayer.resetStyle(this);
+                    });
+                }
+            }).addTo(map);
+            
+            // 지도 범위 조정
+            map.fitBounds(currentLayer.getBounds());
+            
+            // 피처 정보 표시
+            displayFeatureInfo();
+        }
+        
+        function displayFeatureInfo() {
+            featureList.innerHTML = '';
+            
+            if (allFeatures.length === 0) {
+                infoPanel.style.display = 'none';
+                return;
+            }
+            
+            infoPanel.style.display = 'block';
+            
+            allFeatures.slice(0, 10).forEach((feature, index) => {
+                const item = document.createElement('div');
+                item.className = 'feature-item';
+                
+                let content = `<strong>피처 #${index + 1}</strong><br>`;
+                
+                if (feature.properties) {
+                    for (let key in feature.properties) {
+                        content += `
+                            <div class="property">
+                                <span class="property-key">${key}:</span>
+                                <span class="property-value">${feature.properties[key]}</span>
+                            </div>
+                        `;
+                    }
+                }
+                
+                item.innerHTML = content;
+                featureList.appendChild(item);
+            });
+            
+            if (allFeatures.length > 10) {
+                const more = document.createElement('div');
+                more.style.textAlign = 'center';
+                more.style.padding = '10px';
+                more.style.color = '#667eea';
+                more.style.fontWeight = '600';
+                more.textContent = `... 그 외 ${allFeatures.length - 10}개의 피처`;
+                featureList.appendChild(more);
+            }
+        }
+    </script>
+</body>
+</html>
